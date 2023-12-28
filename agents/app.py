@@ -173,7 +173,7 @@ def get_my_reservation(request: get_my_reservation_req) -> get_my_reservation_re
         service.events()
         .list(
             calendarId=calendar_id,
-            q=f'"reservation_holder": "{reservation_holder}"',
+            q=reservation_holder,
         )
         .execute()
     )
@@ -191,7 +191,11 @@ def get_my_reservation(request: get_my_reservation_req) -> get_my_reservation_re
                         x["end"]["dateTime"], "%Y-%m-%dT%H:%M:%S%z"
                     ).date(),
                 ),
-                events["items"],
+                filter(
+                    lambda x: json.loads(x["description"])["reservation_holder"]
+                    == reservation_holder,
+                    events["items"],
+                ),
             )
         )
     }
@@ -202,20 +206,19 @@ class update_type_enum(str, Enum):
     delete = "delete"
 
 
-class update_reservation_req(BaseModel):
+class update_reservation_req(reserve_req):
     update_type: update_type_enum = Field(description="更新する予約の種類（updateかdelete）")
     reserve_id: str = Field(description="予約ID")
-    reserve_info: reserve_req = Field(
-        description="更新する予約の情報。update_typeがupdateの場合は必須。deleteの場合は不要", default=None
-    )
 
 
 @app.post("/update_reservation", description="予約を更新するAPI")
 def update_reservation(request: update_reservation_req):
+    print(request)
+
     if request.update_type == update_type_enum.update:
         now = datetime.datetime.now(timezone)
-        checkin = parse(request.reserve_info.checkin)
-        checkout = parse(request.reserve_info.checkout)
+        checkin = parse(request.checkin)
+        checkout = parse(request.checkout)
 
         # 2023/12/28に1/1をパースすると、2023/1/1になるので、2024/1/1になるように調整
         if checkin.astimezone(timezone) < now:
@@ -231,7 +234,7 @@ def update_reservation(request: update_reservation_req):
             checkout.year, checkout.month, checkout.day, 10, 0, 0, tzinfo=timezone
         )
 
-        description = {"reservation_holder": request.reserve_info.reservation_holder}
+        description = {"reservation_holder": request.reservation_holder}
 
         event = {
             "summary": "hotel booking (Agents for Amazon Bedrock)",
@@ -254,7 +257,7 @@ def update_reservation(request: update_reservation_req):
 
         return reserve_res(
             reserve_id=event["id"],
-            reservation_holder=request.reserve_info.reservation_holder,
+            reservation_holder=request.reservation_holder,
             checkin=datetime.datetime.strptime(
                 event["start"]["dateTime"], "%Y-%m-%dT%H:%M:%S%z"
             ).date(),
