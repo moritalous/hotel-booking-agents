@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  agents-for-bedrock-sample
+
+Parameters:
+  TokenJson:
+    Type: String
+    Default: /hotel-booking-agents/token.json
+
+Globals:
+  Function:
+    Timeout: 60
+
+Resources:
+  AgentsForBedrock:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: agents/
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          TOKEN: !Ref TokenJson
+      Policies:
+        - AmazonSSMFullAccess
+        - AWSLambdaExecute
+
+Outputs:
+  AgentsForBedrockArn:
+    Description: "AgentsForBedrock ARN"
+    Value: !GetAtt AgentsForBedrock.Arn
+  AgentsForBedrockIamRole:
+    Description: "Implicit IAM Role created for AgentsForBedrock"
+    Value: !GetAtt AgentsForBedrockRole.Arn
